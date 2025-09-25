@@ -38,21 +38,6 @@ const CanvasEditor = ({ imageData, onError}) => {
 		setHistoryIndex((prev) => prev + 1);
 	};
 
-	const undo = () => {
-		if (historyIndex > 0) {
-			const newIndex = historyIndex - 1;
-			setHistoryIndex(newIndex);
-			restoreFromHistory(canvasHistory[newIndex]);
-		}
-	};
-
-	const redo = () => {
-		if (historyIndex < canvasHistory.length - 1) {
-			const newIndex = historyIndex + 1;
-			setHistoryIndex(newIndex);
-			restoreFromHistory(canvasHistory[newIndex]);
-		}
-	};
 
 	const restoreFromHistory = (imageDataUrl) => {
 		const canvas = canvasRef.current;
@@ -94,24 +79,6 @@ const CanvasEditor = ({ imageData, onError}) => {
 				</div>
 
 				<div className="canvas-actions">
-					<button
-						className="btn btn-secondary"
-						onClick={undo}
-						disabled={historyIndex <= 0}
-						title="Undo (Ctrl+Z)"
-					>
-						↶ Undo
-					</button>
-
-					<button
-						className="btn btn-secondary"
-						onClick={redo}
-						disabled={historyIndex >= canvasHistory.length - 1}
-						title="Redo (Ctrl+Y)"
-					>
-						↷ Redo
-					</button>
-
 					<button
 						className="btn btn-primary"
 						onClick={downloadImage}
