@@ -32,8 +32,6 @@ const ImageUploader = ({ onImageLoad, onError }) => {
 	};
 
 	const handleFile = (file) => {
-		console.log("📁 File selected:", file.name, file.size, "bytes");
-
 		// Validate file type
 		if (!file.type.startsWith("image/")) {
 			onError("Please select a valid image file");
@@ -50,8 +48,6 @@ const ImageUploader = ({ onImageLoad, onError }) => {
 		reader.onload = (e) => {
 			const img = new Image();
 			img.onload = () => {
-				console.log("🖼️ Image loaded:", img.width, "x", img.height);
-
 				// Create canvas to get image data
 				const canvas = document.createElement("canvas");
 				const ctx = canvas.getContext("2d");
@@ -72,8 +68,6 @@ const ImageUploader = ({ onImageLoad, onError }) => {
 
 				// Draw image on canvas
 				ctx.drawImage(img, 0, 0, width, height);
-
-				console.log("✅ Canvas created:", width, "x", height);
 
 				// Pass image data to parent
 				onImageLoad({
