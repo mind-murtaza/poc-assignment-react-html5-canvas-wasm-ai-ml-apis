@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>POC Image Editor - React + WASM + AI</title>
+		<!-- OpenCV.js WASM from CDN -->
+		<script
+			async
+			src="https://docs.opencv.org/4.x/opencv.js"
+			onload="onOpenCvReady();"
+			type="text/javascript"
+		></script>
+		<script type="text/javascript">
+			// Global OpenCV ready callback
+			function onOpenCvReady() {
+				console.log("OpenCV.js is ready");
+				window.cv = cv;
+				// Dispatch custom event for React components
+				window.dispatchEvent(new CustomEvent("opencv-ready"));
+			}
+		</script>
+	</head>
+	<body>
+		<div id="root"></div>
+		<script type="module" src="/src/main.jsx"></script>
+	</body>
+</html>
