@@ -39,19 +39,6 @@ const CanvasEditor = ({ imageData, onError}) => {
 	};
 
 
-	const restoreFromHistory = (imageDataUrl) => {
-		const canvas = canvasRef.current;
-		const ctx = canvas.getContext("2d");
-		const img = new Image();
-
-		img.onload = () => {
-			ctx.clearRect(0, 0, canvas.width, canvas.height);
-			ctx.drawImage(img, 0, 0);
-		};
-
-		img.src = imageDataUrl;
-	};
-
 	const downloadImage = () => {
 		const canvas = canvasRef.current;
 		const link = document.createElement("a");
