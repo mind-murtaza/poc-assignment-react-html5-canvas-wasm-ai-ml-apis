@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { parseCommand, executeCommand } from "../services/groqApi";
+import { parseCommand, executeCommand, getModelStatus } from "../services/textToTextApi";
 
 const CommandInput = ({ imageData, onLoadingChange, onSuccess, onError }) => {
 	const [command, setCommand] = useState("");
@@ -37,7 +37,7 @@ const CommandInput = ({ imageData, onLoadingChange, onSuccess, onError }) => {
 		onLoadingChange(true, "Parsing command with AI...");
 
 		try {
-			// Parse command using Groq API
+			// Parse command using ONNX T5-Small
 			const parsedCommand = await parseCommand(commandText);
 
 			onLoadingChange(true, "Executing command...");
@@ -72,20 +72,15 @@ const CommandInput = ({ imageData, onLoadingChange, onSuccess, onError }) => {
 		setCommand(exampleCommand);
 	};
 
-	const isApiConfigured =
-		import.meta.env.VITE_GROQ_API_KEY &&
-		import.meta.env.VITE_GROQ_API_KEY !== "your_groq_api_key_here";
 
 	return (
 		<div className="control-group">
-			<h3>💬 Natural Language Commands</h3>
+			<h3>🤖 FLAN-T5-Small Text-to-Text</h3>
 
-			{!isApiConfigured && (
-				<div className="status-warning">
-					<p>⚠️ Groq API not configured</p>
-					<small>Add VITE_GROQ_API_KEY to your .env file</small>
-				</div>
-			)}
+			<div className="status-success">
+				<p>✅ FLAN-T5-Small Ready</p>
+				<small>Direct text-to-JSON generation with Transformers.js!</small>
+			</div>
 
 			<form onSubmit={handleSubmit} className="command-form">
 				<div className="form-group">
@@ -96,15 +91,14 @@ const CommandInput = ({ imageData, onLoadingChange, onSuccess, onError }) => {
 						value={command}
 						onChange={(e) => setCommand(e.target.value)}
 						placeholder="Try: 'draw red circle' or 'brighten image 20%'"
-						disabled={!isApiConfigured || isProcessing || !imageData}
+						disabled={isProcessing || !imageData}
 					/>
 				</div>
 
 				<button
 					type="submit"
 					className="btn btn-success"
-					disabled={
-						!isApiConfigured || isProcessing || !imageData || !command.trim()
+					disabled={ isProcessing || !imageData || !command.trim()
 					}
 				>
 					{isProcessing ? "🤖 Processing..." : "⚡ Execute Command"}
@@ -119,7 +113,7 @@ const CommandInput = ({ imageData, onLoadingChange, onSuccess, onError }) => {
 							key={index}
 							className="example-btn"
 							onClick={() => handleExampleClick(example)}
-							disabled={!isApiConfigured || isProcessing || !imageData}
+							disabled={isProcessing || !imageData}
 						>
 							{example}
 						</button>
