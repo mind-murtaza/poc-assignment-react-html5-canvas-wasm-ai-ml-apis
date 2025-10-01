@@ -270,6 +270,65 @@ const CanvasEditor = ({ imageData, onError }) => {
 		}
 	}, [onError, imageData]);
 
+	/**
+	 * Handles copy selection to clipboard
+	 */
+	const handleCopySelection = useCallback(async () => {
+		if (!brushSelectionServiceRef.current || !exportServiceRef.current) {
+			onError?.('Copy service not available');
+			return;
+		}
+
+		if (!hasSelection) {
+			onError?.('No selection to copy');
+			return;
+		}
+
+		try {
+			// Get the selection mask
+			const mask = brushSelectionServiceRef.current.getSelectionMask();
+			if (!mask) {
+				onError?.('No selection mask found');
+				return;
+			}
+
+			// Export the selection as a data URL
+			console.log('📤 Exporting selection to data URL...');
+			const dataUrl = exportServiceRef.current.exportSelection(mask, 'png');
+			console.log('✅ Selection exported, data URL length:', dataUrl.length);
+
+			// Convert data URL to blob
+			const response = await fetch(dataUrl);
+			const blob = await response.blob();
+
+			// Copy to clipboard using modern API
+			try {
+				if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+					// For image/png blob
+					const clipboardItem = new window.ClipboardItem({ 'image/png': blob });
+					await navigator.clipboard.write([clipboardItem]);
+					// Show success feedback to user
+					alert('✅ Selection copied to clipboard! You can now paste it anywhere.');
+				} else {
+					throw new Error('Clipboard API not supported');
+				}
+			} catch (clipboardError) {
+				console.warn('⚠️ Modern clipboard API not available, using fallback');
+				// Fallback for older browsers - download the image
+				const link = document.createElement('a');
+				link.href = dataUrl;
+				link.download = 'selection.png';
+				link.style.display = 'none';
+				document.body.appendChild(link);
+				link.click();
+				document.body.removeChild(link);
+				alert('✅ Selection downloaded as selection.png');
+			}
+		} catch (error) {
+			console.error('❌ Copy error:', error);
+			onError?.(`Copy selection error: ${error.message}`);
+		}
+	}, [onError, hasSelection]);
 
 	/**
 	 * Handles selection mode change from controls
@@ -370,6 +429,7 @@ const CanvasEditor = ({ imageData, onError }) => {
 					onInvertSelection={handleInvertSelection}
 					onExportSelection={handleExportSelection}
 					onExportCanvas={handleExportCanvas}
+					onCopySelection={handleCopySelection}
 					onSelectionModeChange={handleSelectionModeChange}
 					disabled={!imageData}
 				/>

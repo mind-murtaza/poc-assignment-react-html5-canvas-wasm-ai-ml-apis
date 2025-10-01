@@ -185,51 +185,6 @@ class BrushSelectionService {
 		return this.selectionMask;
 	}
 
-	/**
-	 * Checks if a point is within the current selection
-	 * @param {number} x - X coordinate
-	 * @param {number} y - Y coordinate
-	 * @returns {boolean} True if point is selected
-	 */
-	isPointSelected(x, y) {
-		if (!this.selectionMask) return false;
-
-		const imageData = this.maskDataContext.getImageData(x, y, 1, 1);
-		const alpha = imageData.data[3];
-		return alpha > 0;
-	}
-
-	/**
-	 * Gets selection bounds (min/max x,y coordinates of selection)
-	 * @returns {Object|null} Selection bounds or null if no selection
-	 */
-	getSelectionBounds() {
-		if (!this.selectionMask) return null;
-
-		const imageData = this.maskDataContext.getImageData(0, 0, this.canvasWidth, this.canvasHeight);
-		const data = imageData.data;
-
-		let minX = this.canvasWidth;
-		let minY = this.canvasHeight;
-		let maxX = 0;
-		let maxY = 0;
-
-		for (let y = 0; y < this.canvasHeight; y++) {
-			for (let x = 0; x < this.canvasWidth; x++) {
-				const index = (y * this.canvasWidth + x) * 4;
-				if (data[index + 3] > 200) { // Selected pixel (higher threshold for mask data)
-					minX = Math.min(minX, x);
-					minY = Math.min(minY, y);
-					maxX = Math.max(maxX, x);
-					maxY = Math.max(maxY, y);
-				}
-			}
-		}
-
-		if (minX > maxX) return null; // No selection
-
-		return { minX, minY, maxX, maxY };
-	}
 }
 
 export default BrushSelectionService;

@@ -11,6 +11,7 @@ const BrushControls = ({
 	onInvertSelection,
 	onExportSelection,
 	onExportCanvas,
+	onCopySelection,
 	onSelectionModeChange,
 	brushSize = 10,
 	hasSelection = false,
@@ -84,6 +85,13 @@ const BrushControls = ({
 	}, [onExportCanvas]);
 
 	/**
+	 * Handles copy selection action
+	 */
+	const handleCopySelection = useCallback(() => {
+		onCopySelection?.();
+	}, [onCopySelection]);
+
+	/**
 	 * Renders brush size preset buttons
 	 * @returns {JSX.Element[]} Array of brush size buttons
 	 */
@@ -142,6 +150,15 @@ const BrushControls = ({
 							title="Invert current selection"
 						>
 							🔄 Invert
+						</button>
+						<button
+							type="button"
+							className="btn btn-primary"
+							onClick={handleCopySelection}
+							disabled={disabled}
+							title="Copy selected area to clipboard"
+						>
+							📋 Copy
 						</button>
 					</div>
 				</div>

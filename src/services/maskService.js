@@ -143,114 +143,14 @@ class MaskService {
 			case 'fill':
 				return this.fillSelectedArea(maskCanvas, options.fillColor);
 
-			case 'copy':
-				return this.copySelectedArea(maskCanvas, options.destinationX, options.destinationY);
-
 			default:
 				throw new Error(`Unsupported mask operation: ${operation}`);
 		}
 	}
 
-	/**
-	 * Fills selected area with specified color
-	 * @param {HTMLCanvasElement} maskCanvas - Mask canvas
-	 * @param {string} fillColor - Color to fill with
-	 * @returns {boolean} Success status
-	 */
-	fillSelectedArea(maskCanvas, fillColor) {
-		const color = this.parseColor(fillColor);
-		return this.deleteSelectedArea(maskCanvas, `rgba(${color.r}, ${color.g}, ${color.b}, 1)`);
-	}
 
-	/**
-	 * Copies selected area to a new location (placeholder for future implementation)
-	 * @param {HTMLCanvasElement} maskCanvas - Mask canvas
-	 * @param {number} destX - Destination X coordinate
-	 * @param {number} destY - Destination Y coordinate
-	 * @returns {boolean} Success status
-	 */
-	copySelectedArea(maskCanvas, destX, destY) {
-		// This would implement copy/paste functionality
-		// For now, return false as not implemented
-		console.warn('Copy operation not yet implemented');
-		return false;
-	}
 
-	/**
-	 * Parses color string into RGB components
-	 * @param {string} color - Color string (hex, rgb, rgba, named colors)
-	 * @returns {Object} RGB color object with r, g, b properties
-	 * @throws {Error} If color format is invalid
-	 */
-	parseColor(color) {
-		// Handle transparent
-		if (color === 'transparent') {
-			return { r: 0, g: 0, b: 0 };
-		}
 
-		// Create temporary canvas to parse color
-		const tempCanvas = document.createElement('canvas');
-		tempCanvas.width = 1;
-		tempCanvas.height = 1;
-		const tempContext = tempCanvas.getContext('2d');
-
-		tempContext.fillStyle = color;
-		tempContext.fillRect(0, 0, 1, 1);
-
-		const imageData = tempContext.getImageData(0, 0, 1, 1);
-		const data = imageData.data;
-
-		return {
-			r: data[0],
-			g: data[1],
-			b: data[2]
-		};
-	}
-
-	/**
-	 * Validates mask canvas dimensions
-	 * @param {HTMLCanvasElement} maskCanvas - Mask canvas to validate
-	 * @returns {boolean} True if valid
-	 */
-	validateMaskCanvas(maskCanvas) {
-		if (!maskCanvas) return false;
-
-		// Allow for small floating point differences due to scaling
-		const tolerance = 1; // Allow 1 pixel difference
-		return Math.abs(maskCanvas.width - this.canvasWidth) <= tolerance &&
-			   Math.abs(maskCanvas.height - this.canvasHeight) <= tolerance;
-	}
-
-	/**
-	 * Gets mask statistics (selected vs unselected pixels)
-	 * @param {HTMLCanvasElement} maskCanvas - Mask canvas
-	 * @returns {Object} Statistics object
-	 */
-	getMaskStatistics(maskCanvas) {
-		if (!this.validateMaskCanvas(maskCanvas)) {
-			throw new Error('Invalid mask canvas');
-		}
-
-		const context = maskCanvas.getContext('2d');
-		const imageData = context.getImageData(0, 0, this.canvasWidth, this.canvasHeight);
-		const data = imageData.data;
-
-		let selectedPixels = 0;
-		let totalPixels = this.canvasWidth * this.canvasHeight;
-
-		for (let i = 0; i < data.length; i += 4) {
-			if (data[i + 3] > 128) {
-				selectedPixels++;
-			}
-		}
-
-		return {
-			selectedPixels,
-			unselectedPixels: totalPixels - selectedPixels,
-			totalPixels,
-			selectionRatio: selectedPixels / totalPixels
-		};
-	}
 }
 
 export default MaskService;

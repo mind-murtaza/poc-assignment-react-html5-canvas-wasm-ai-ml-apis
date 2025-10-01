@@ -248,31 +248,6 @@ class ExportService {
 		return `${baseName}.${extension}`;
 	}
 
-	/**
-	 * Gets available export formats
-	 * @returns {Array<string>} Array of supported formats
-	 */
-	getSupportedFormats() {
-		return ['png', 'jpeg'];
-	}
-
-	/**
-	 * Validates export options
-	 * @param {Object} options - Options to validate
-	 * @returns {Object} Validated options with defaults
-	 */
-	validateOptions(options) {
-		const validOptions = { ...options };
-
-		// Validate quality (0-1)
-		if (validOptions.quality !== undefined) {
-			validOptions.quality = Math.max(0, Math.min(1, validOptions.quality));
-		} else {
-			validOptions.quality = 0.9;
-		}
-
-		return validOptions;
-	}
 }
 
 export default ExportService;
