@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import BrushSelectionService from "../services/brushSelectionService";
+import MagicWandService from "../services/magicWandService";
 import MaskService from "../services/maskService";
 import ExportService from "../services/exportService";
 import BrushControls from "./BrushControls";
@@ -11,28 +12,19 @@ import BrushControls from "./BrushControls";
 const CanvasEditor = ({ imageData, onError }) => {
 	const canvasRef = useRef(null);
 	const overlayCanvasRef = useRef(null);
-	const [canvasHistory, setCanvasHistory] = useState([]);
-	const [historyIndex, setHistoryIndex] = useState(-1);
 	const [brushSize, setBrushSize] = useState(10);
 	const [hasSelection, setHasSelection] = useState(false);
 	const [isBrushActive, setIsBrushActive] = useState(false);
-	const [currentTool, setCurrentTool] = useState('brush'); // 'brush', 'hand'
 	const [selectionMode, setSelectionMode] = useState(true);
+	const [currentTool, setCurrentTool] = useState('brush'); // 'brush', 'magicWand'
+	const [magicWandTolerance, setMagicWandTolerance] = useState(30);
 
 	// Service instances
 	const brushSelectionServiceRef = useRef(null);
+	const magicWandServiceRef = useRef(null);
 	const maskServiceRef = useRef(null);
 	const exportServiceRef = useRef(null);
 
-	/**
-	 * Saves current canvas state to history
-	 * @param {HTMLCanvasElement} canvas - Canvas to save
-	 */
-	const saveToHistory = useCallback((canvas) => {
-		const imageDataUrl = canvas.toDataURL();
-		setCanvasHistory((prev) => [...prev, imageDataUrl]);
-		setHistoryIndex((prev) => prev + 1);
-	}, []); // Empty dependency array to prevent re-creation
 
 	/**
 	 * Initializes canvas and services when image data is available
@@ -61,17 +53,23 @@ const CanvasEditor = ({ imageData, onError }) => {
 
 			// Initialize services
 			brushSelectionServiceRef.current = new BrushSelectionService(overlayCtx, imageData.width, imageData.height);
+			magicWandServiceRef.current = new MagicWandService(ctx, overlayCtx, imageData.width, imageData.height);
 			maskServiceRef.current = new MaskService(ctx, imageData.width, imageData.height);
 			exportServiceRef.current = new ExportService(ctx, imageData.width, imageData.height);
 
-			// Save initial state to history
-			saveToHistory(canvas);
-
 			// Set initial brush size
 			brushSelectionServiceRef.current.setBrushSize(brushSize);
+
+			// Set initial magic wand tolerance
+			if (magicWandServiceRef.current) {
+				magicWandServiceRef.current.setTolerance(magicWandTolerance);
+			}
+
+			// Expose canvas reference for other components (OpenCV, AI, etc.)
+			window.currentCanvas = canvas;
 		}
 	// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [imageData]); // Only re-run when imageData changes
+	}, [imageData, brushSize, magicWandTolerance]); // Re-run when image, brush size, or tolerance changes
 
 	/**
 	 * Updates brush size in service when it changes
@@ -85,6 +83,19 @@ const CanvasEditor = ({ imageData, onError }) => {
 			}
 		}
 	}, [brushSize, onError]);
+
+	/**
+	 * Updates magic wand tolerance in service when it changes
+	 */
+	useEffect(() => {
+		if (magicWandServiceRef.current) {
+			try {
+				magicWandServiceRef.current.setTolerance(magicWandTolerance);
+			} catch (error) {
+				onError?.(`Magic wand tolerance error: ${error.message}`);
+			}
+		}
+	}, [magicWandTolerance, onError]);
 
 
 	/**
@@ -105,24 +116,34 @@ const CanvasEditor = ({ imageData, onError }) => {
 	}, []);
 
 	/**
-	 * Handles mouse down event for brush selection
+	 * Handles mouse down event for brush/magic wand selection
 	 * @param {MouseEvent} event - Mouse down event
 	 */
 	const handleMouseDown = useCallback((event) => {
-		if (currentTool !== 'brush' || !selectionMode || !brushSelectionServiceRef.current) {
+		if (!selectionMode) {
 			return;
 		}
 
 		const { x, y } = getMousePos(event);
-		setIsBrushActive(true);
+		const isShiftClick = event.shiftKey;
 
 		try {
-			brushSelectionServiceRef.current.startSelection(x, y);
-			setHasSelection(true);
+			if (currentTool === 'magicWand' && magicWandServiceRef.current) {
+				// Magic wand selection
+				const success = magicWandServiceRef.current.performMagicWand(x, y, isShiftClick);
+				if (success) {
+					setHasSelection(true);
+				}
+			} else if (currentTool === 'brush' && brushSelectionServiceRef.current) {
+				// Brush selection
+				setIsBrushActive(true);
+				brushSelectionServiceRef.current.startSelection(x, y);
+				setHasSelection(true);
+			}
 		} catch (error) {
-			onError?.(`Brush selection error: ${error.message}`);
+			onError?.(`Selection error: ${error.message}`);
 		}
-	}, [currentTool, selectionMode, getMousePos, onError]);
+	}, [selectionMode, currentTool, getMousePos, onError]);
 
 	/**
 	 * Handles mouse move event for brush selection
@@ -168,11 +189,16 @@ const CanvasEditor = ({ imageData, onError }) => {
 	 * Clears current selection
 	 */
 	const handleClearSelection = useCallback(() => {
-		if (!brushSelectionServiceRef.current) return;
-
 		try {
-			brushSelectionServiceRef.current.clearMask();
+			// Clear both brush and magic wand selections
+			if (brushSelectionServiceRef.current) {
+				brushSelectionServiceRef.current.clearMask();
+			}
+			if (magicWandServiceRef.current) {
+				magicWandServiceRef.current.clearMask();
+			}
 			setHasSelection(false);
+			setIsBrushActive(false);
 		} catch (error) {
 			onError?.(`Clear selection error: ${error.message}`);
 		}
@@ -182,10 +208,21 @@ const CanvasEditor = ({ imageData, onError }) => {
 	 * Deletes selected area
 	 */
 	const handleDeleteSelection = useCallback(() => {
-		if (!brushSelectionServiceRef.current || !maskServiceRef.current) return;
+		if (!maskServiceRef.current) return;
 
 		try {
-			const mask = brushSelectionServiceRef.current.getSelectionMask();
+			let mask = null;
+
+			// Try to get mask from brush service first
+			if (brushSelectionServiceRef.current) {
+				mask = brushSelectionServiceRef.current.getSelectionMask();
+			}
+
+			// If no brush selection, try magic wand
+			if (!mask && magicWandServiceRef.current) {
+				mask = magicWandServiceRef.current.getSelectionMask();
+			}
+
 			if (!mask) {
 				onError?.('No selection to delete');
 				return;
@@ -193,33 +230,49 @@ const CanvasEditor = ({ imageData, onError }) => {
 
 			const success = maskServiceRef.current.deleteSelectedArea(mask, 'transparent');
 			if (success) {
-				saveToHistory(canvasRef.current);
 				setHasSelection(false);
 			}
 		} catch (error) {
 			onError?.(`Delete selection error: ${error.message}`);
 		}
-	}, [onError, saveToHistory]);
+	}, [onError]);
 
 	/**
 	 * Inverts current selection
 	 */
 	const handleInvertSelection = useCallback(() => {
-		if (!brushSelectionServiceRef.current || !maskServiceRef.current) return;
+		if (!maskServiceRef.current) return;
 
 		try {
-			const mask = brushSelectionServiceRef.current.getSelectionMask();
+			let mask = null;
+			let targetService = null;
+
+			// Try to get mask from brush service first
+			if (brushSelectionServiceRef.current) {
+				mask = brushSelectionServiceRef.current.getSelectionMask();
+				targetService = brushSelectionServiceRef.current;
+			}
+
+			// If no brush selection, try magic wand
+			if (!mask && magicWandServiceRef.current) {
+				mask = magicWandServiceRef.current.getSelectionMask();
+				targetService = magicWandServiceRef.current;
+			}
+
 			if (!mask) {
 				onError?.('No selection to invert');
 				return;
 			}
 
 			const invertedMask = maskServiceRef.current.invertSelection(mask);
-			// Update the brush selection service with the inverted mask
-			const invertedContext = invertedMask.getContext('2d');
-			brushSelectionServiceRef.current.maskContext.clearRect(0, 0, imageData.width, imageData.height);
-			brushSelectionServiceRef.current.maskContext.drawImage(invertedMask, 0, 0);
-			brushSelectionServiceRef.current.selectionMask = invertedMask;
+
+			// Update the appropriate service with the inverted mask
+			if (targetService) {
+				const invertedContext = invertedMask.getContext('2d');
+				targetService.maskContext.clearRect(0, 0, imageData.width, imageData.height);
+				targetService.maskContext.drawImage(invertedMask, 0, 0);
+				targetService.selectionMask = invertedMask;
+			}
 
 		} catch (error) {
 			onError?.(`Invert selection error: ${error.message}`);
@@ -231,7 +284,7 @@ const CanvasEditor = ({ imageData, onError }) => {
 	 * @param {string} format - Export format ('png' or 'jpeg')
 	 */
 	const handleExportSelection = useCallback((format) => {
-		if (!brushSelectionServiceRef.current || !exportServiceRef.current) {
+		if (!exportServiceRef.current) {
 			return;
 		}
 
@@ -241,7 +294,17 @@ const CanvasEditor = ({ imageData, onError }) => {
 		}
 
 		try {
-			const mask = brushSelectionServiceRef.current.getSelectionMask();
+			let mask = null;
+
+			// Try to get mask from brush service first
+			if (brushSelectionServiceRef.current) {
+				mask = brushSelectionServiceRef.current.getSelectionMask();
+			}
+
+			// If no brush selection, try magic wand
+			if (!mask && magicWandServiceRef.current) {
+				mask = magicWandServiceRef.current.getSelectionMask();
+			}
 
 			if (!mask) {
 				onError?.('No selection to export');
@@ -274,7 +337,7 @@ const CanvasEditor = ({ imageData, onError }) => {
 	 * Handles copy selection to clipboard
 	 */
 	const handleCopySelection = useCallback(async () => {
-		if (!brushSelectionServiceRef.current || !exportServiceRef.current) {
+		if (!exportServiceRef.current) {
 			onError?.('Copy service not available');
 			return;
 		}
@@ -285,17 +348,25 @@ const CanvasEditor = ({ imageData, onError }) => {
 		}
 
 		try {
-			// Get the selection mask
-			const mask = brushSelectionServiceRef.current.getSelectionMask();
+			let mask = null;
+
+			// Try to get mask from brush service first
+			if (brushSelectionServiceRef.current) {
+				mask = brushSelectionServiceRef.current.getSelectionMask();
+			}
+
+			// If no brush selection, try magic wand
+			if (!mask && magicWandServiceRef.current) {
+				mask = magicWandServiceRef.current.getSelectionMask();
+			}
+
 			if (!mask) {
 				onError?.('No selection mask found');
 				return;
 			}
 
 			// Export the selection as a data URL
-			console.log('📤 Exporting selection to data URL...');
 			const dataUrl = exportServiceRef.current.exportSelection(mask, 'png');
-			console.log('✅ Selection exported, data URL length:', dataUrl.length);
 
 			// Convert data URL to blob
 			const response = await fetch(dataUrl);
@@ -313,19 +384,17 @@ const CanvasEditor = ({ imageData, onError }) => {
 					throw new Error('Clipboard API not supported');
 				}
 			} catch (clipboardError) {
-				console.warn('⚠️ Modern clipboard API not available, using fallback');
 				// Fallback for older browsers - download the image
 				const link = document.createElement('a');
 				link.href = dataUrl;
 				link.download = 'selection.png';
 				link.style.display = 'none';
 				document.body.appendChild(link);
-				link.click();
+		link.click();
 				document.body.removeChild(link);
 				alert('✅ Selection downloaded as selection.png');
 			}
 		} catch (error) {
-			console.error('❌ Copy error:', error);
 			onError?.(`Copy selection error: ${error.message}`);
 		}
 	}, [onError, hasSelection]);
@@ -343,21 +412,32 @@ const CanvasEditor = ({ imageData, onError }) => {
 	}, []);
 
 	/**
+	 * Handles tool change (brush/magic wand)
+	 * @param {string} tool - Tool type ('brush' or 'magicWand')
+	 */
+	const handleToolChange = useCallback((tool) => {
+		setCurrentTool(tool);
+		setIsBrushActive(false);
+	}, []);
+
+	/**
+	 * Handles magic wand tolerance change
+	 * @param {number} tolerance - New tolerance value
+	 */
+	const handleMagicWandToleranceChange = useCallback((tolerance) => {
+		setMagicWandTolerance(tolerance);
+		if (magicWandServiceRef.current) {
+			magicWandServiceRef.current.setTolerance(tolerance);
+		}
+	}, []);
+
+	/**
 	 * Legacy download function for backward compatibility
 	 */
 	const downloadImage = useCallback(() => {
 		handleExportCanvas('png');
 	}, [handleExportCanvas]);
 
-	/**
-	 * Exposes canvas methods for other components
-	 */
-	useEffect(() => {
-		if (canvasRef.current) {
-			window.currentCanvas = canvasRef.current;
-			window.saveCanvasState = () => saveToHistory(canvasRef.current);
-		}
-	}, [saveToHistory]);
 
 	return (
 		<div className="canvas-editor">
@@ -410,7 +490,7 @@ const CanvasEditor = ({ imageData, onError }) => {
 							width: '100%',
 							height: '100%',
 							pointerEvents: 'none',
-							opacity: selectionMode && (hasSelection || isBrushActive) ? 1 : 0,
+							opacity: selectionMode && (isBrushActive || hasSelection) ? 1 : 0,
 							transition: 'opacity 0.3s ease',
 							zIndex: 10,
 							borderRadius: "8px",
@@ -423,6 +503,8 @@ const CanvasEditor = ({ imageData, onError }) => {
 					brushSize={brushSize}
 					hasSelection={hasSelection}
 					selectionMode={selectionMode}
+					currentTool={currentTool}
+					magicWandTolerance={magicWandTolerance}
 					onBrushSizeChange={handleBrushSizeChange}
 					onClearSelection={handleClearSelection}
 					onDeleteSelection={handleDeleteSelection}
@@ -431,6 +513,8 @@ const CanvasEditor = ({ imageData, onError }) => {
 					onExportCanvas={handleExportCanvas}
 					onCopySelection={handleCopySelection}
 					onSelectionModeChange={handleSelectionModeChange}
+					onToolChange={handleToolChange}
+					onMagicWandToleranceChange={handleMagicWandToleranceChange}
 					disabled={!imageData}
 				/>
 			</div>

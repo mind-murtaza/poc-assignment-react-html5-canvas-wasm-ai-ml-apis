@@ -13,13 +13,19 @@ const BrushControls = ({
 	onExportCanvas,
 	onCopySelection,
 	onSelectionModeChange,
+	onToolChange,
+	onMagicWandToleranceChange,
 	brushSize = 10,
 	hasSelection = false,
 	disabled = false,
-	selectionMode = true
+	selectionMode = true,
+	currentTool = 'brush',
+	magicWandTolerance = 30
 }) => {
 	const [currentBrushSize, setCurrentBrushSize] = useState(brushSize);
 	const [isSelectionMode, setIsSelectionMode] = useState(selectionMode);
+	const [currentToolState, setCurrentToolState] = useState(currentTool);
+	const [currentTolerance, setCurrentTolerance] = useState(magicWandTolerance);
 
 	// Sync local state with props when they change
 	useEffect(() => {
@@ -29,6 +35,14 @@ const BrushControls = ({
 	useEffect(() => {
 		setCurrentBrushSize(brushSize);
 	}, [brushSize]);
+
+	useEffect(() => {
+		setCurrentToolState(currentTool);
+	}, [currentTool]);
+
+	useEffect(() => {
+		setCurrentTolerance(magicWandTolerance);
+	}, [magicWandTolerance]);
 
 	/**
 	 * Handles brush size slider change
@@ -90,6 +104,23 @@ const BrushControls = ({
 	const handleCopySelection = useCallback(() => {
 		onCopySelection?.();
 	}, [onCopySelection]);
+
+	/**
+	 * Handles tool change (brush/magic wand)
+	 */
+	const handleToolChange = useCallback((tool) => {
+		setCurrentToolState(tool);
+		onToolChange?.(tool);
+	}, [onToolChange]);
+
+	/**
+	 * Handles magic wand tolerance change
+	 */
+	const handleToleranceChange = useCallback((event) => {
+		const newTolerance = parseInt(event.target.value, 10);
+		setCurrentTolerance(newTolerance);
+		onMagicWandToleranceChange?.(newTolerance);
+	}, [onMagicWandToleranceChange]);
 
 	/**
 	 * Renders brush size preset buttons
@@ -217,54 +248,100 @@ const BrushControls = ({
 	return (
 		<div className={`brush-controls ${disabled ? 'disabled' : ''}`}>
 			<div className="control-section">
-				<h3>🎨 Brush Selection Tool</h3>
+				<h3>✨ Selection Tool</h3>
 
 				<div className="mode-toggle">
 					<label className="toggle-label">
-						<input
-							type="checkbox"
-							checked={isSelectionMode}
-							onChange={handleSelectionModeToggle}
-							disabled={disabled}
-						/>
-						<span className="toggle-switch"></span>
-						Selection Mode
+						<span className={`toggle-switch ${isSelectionMode ? 'active' : ''}`} onClick={handleSelectionModeToggle}>
+							<span className="toggle-slider"></span>
+						</span>
+						<span className="toggle-text" onClick={handleSelectionModeToggle}>
+							Selection Mode {isSelectionMode ? 'ON' : 'OFF'}
+						</span>
 					</label>
 				</div>
 
-				<div className="brush-size-control">
-					<label htmlFor="brush-size">
-						Brush Size: <span className="brush-size-value">{currentBrushSize}px</span>
-					</label>
-					<input
-						id="brush-size"
-						type="range"
-						min="1"
-						max="50"
-						value={currentBrushSize}
-						onChange={handleBrushSizeChange}
-						disabled={disabled}
-						className="brush-size-slider"
-					/>
-					<div className="brush-size-presets">
-						{renderBrushSizePresets()}
+				<div className="tool-selection">
+					<label>Tool:</label>
+					<div className="tool-buttons">
+						<button
+							type="button"
+							className={`tool-btn ${currentToolState === 'brush' ? 'active' : ''}`}
+							onClick={() => handleToolChange('brush')}
+							disabled={disabled}
+							title="Brush selection tool"
+						>
+							🖌️ Brush
+						</button>
+						<button
+							type="button"
+							className={`tool-btn ${currentToolState === 'magicWand' ? 'active' : ''}`}
+							onClick={() => handleToolChange('magicWand')}
+							disabled={disabled}
+							title="Magic wand selection tool"
+						>
+							🪄 Magic Wand
+						</button>
 					</div>
 				</div>
 
+				{currentToolState === 'brush' && (
+					<>
+						<div className="brush-size-control">
+							<label htmlFor="brush-size">
+								Brush Size: <span className="brush-size-value">{currentBrushSize}px</span>
+							</label>
+							<input
+								id="brush-size"
+								type="range"
+								min="1"
+								max="50"
+								value={currentBrushSize}
+								onChange={handleBrushSizeChange}
+								disabled={disabled}
+								className="brush-size-slider"
+							/>
+							<div className="brush-size-presets">
+								{renderBrushSizePresets()}
+							</div>
+						</div>
 
-				<div className="brush-preview">
-					<div
-						className="brush-circle"
-						style={{
-							width: `${currentBrushSize}px`,
-							height: `${currentBrushSize}px`,
-							borderRadius: `${currentBrushSize / 2}px`,
-							backgroundColor: 'rgba(255, 107, 107, 0.7)',
-							border: '2px solid rgba(255, 107, 107, 0.9)'
-						}}
-					/>
-					<span>Current Brush</span>
-				</div>
+						<div className="brush-preview">
+							<div
+								className="brush-circle"
+								style={{
+									width: `${currentBrushSize}px`,
+									height: `${currentBrushSize}px`,
+									borderRadius: `${currentBrushSize / 2}px`,
+									backgroundColor: 'rgba(255, 107, 107, 0.7)',
+									border: '2px solid rgba(255, 107, 107, 0.9)'
+								}}
+							/>
+							<span>Current Brush</span>
+						</div>
+					</>
+				)}
+
+				{currentToolState === 'magicWand' && (
+					<div className="tolerance-control">
+						<label htmlFor="magic-wand-tolerance">
+							Tolerance: <span className="tolerance-value">{currentTolerance}</span>
+						</label>
+						<input
+							id="magic-wand-tolerance"
+							type="range"
+							min="0"
+							max="255"
+							value={currentTolerance}
+							onChange={handleToleranceChange}
+							disabled={disabled}
+							className="tolerance-slider"
+						/>
+						<div className="tolerance-info">
+							<small>0 = Exact color match, 255 = All colors</small>
+						</div>
+					</div>
+				)}
 			</div>
 
 			{renderSelectionOperations()}
