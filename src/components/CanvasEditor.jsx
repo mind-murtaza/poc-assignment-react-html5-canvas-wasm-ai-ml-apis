@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import BrushSelectionService from "../services/brushSelectionService";
 import MagicWandService from "../services/magicWandService";
+import PolygonSelectionService from "../services/polygonSelectionService";
 import MaskService from "../services/maskService";
 import ExportService from "../services/exportService";
+import HistoryService from "../services/historyService";
 import BrushControls from "./BrushControls";
 
 /**
@@ -15,15 +17,20 @@ const CanvasEditor = ({ imageData, onError }) => {
 	const [brushSize, setBrushSize] = useState(10);
 	const [hasSelection, setHasSelection] = useState(false);
 	const [isBrushActive, setIsBrushActive] = useState(false);
+	const [isPolygonActive, setIsPolygonActive] = useState(false);
 	const [selectionMode, setSelectionMode] = useState(true);
-	const [currentTool, setCurrentTool] = useState('brush'); // 'brush', 'magicWand'
+	const [currentTool, setCurrentTool] = useState('brush'); // 'brush', 'magicWand', 'polygon'
 	const [magicWandTolerance, setMagicWandTolerance] = useState(30);
+	const [canUndo, setCanUndo] = useState(false);
+	const [canRedo, setCanRedo] = useState(false);
 
 	// Service instances
 	const brushSelectionServiceRef = useRef(null);
 	const magicWandServiceRef = useRef(null);
+	const polygonSelectionServiceRef = useRef(null);
 	const maskServiceRef = useRef(null);
 	const exportServiceRef = useRef(null);
+	const historyServiceRef = useRef(null);
 
 
 	/**
@@ -54,8 +61,10 @@ const CanvasEditor = ({ imageData, onError }) => {
 			// Initialize services
 			brushSelectionServiceRef.current = new BrushSelectionService(overlayCtx, imageData.width, imageData.height);
 			magicWandServiceRef.current = new MagicWandService(ctx, overlayCtx, imageData.width, imageData.height);
+			polygonSelectionServiceRef.current = new PolygonSelectionService(overlayCtx, imageData.width, imageData.height);
 			maskServiceRef.current = new MaskService(ctx, imageData.width, imageData.height);
 			exportServiceRef.current = new ExportService(ctx, imageData.width, imageData.height);
+			historyServiceRef.current = new HistoryService(50);
 
 			// Set initial brush size
 			brushSelectionServiceRef.current.setBrushSize(brushSize);
@@ -64,6 +73,10 @@ const CanvasEditor = ({ imageData, onError }) => {
 			if (magicWandServiceRef.current) {
 				magicWandServiceRef.current.setTolerance(magicWandTolerance);
 			}
+
+			// Save initial state to history
+			historyServiceRef.current.saveState(canvas);
+			updateHistoryState();
 
 			// Expose canvas reference for other components (OpenCV, AI, etc.)
 			window.currentCanvas = canvas;
@@ -97,6 +110,26 @@ const CanvasEditor = ({ imageData, onError }) => {
 		}
 	}, [magicWandTolerance, onError]);
 
+	/**
+	 * Updates the undo/redo state
+	 */
+	const updateHistoryState = useCallback(() => {
+		if (historyServiceRef.current) {
+			setCanUndo(historyServiceRef.current.canUndo());
+			setCanRedo(historyServiceRef.current.canRedo());
+		}
+	}, []);
+
+	/**
+	 * Saves current canvas state to history
+	 */
+	const saveToHistory = useCallback(() => {
+		if (canvasRef.current && historyServiceRef.current) {
+			historyServiceRef.current.saveState(canvasRef.current);
+			updateHistoryState();
+		}
+	}, [updateHistoryState]);
+
 
 	/**
 	 * Gets mouse position relative to canvas
@@ -116,7 +149,7 @@ const CanvasEditor = ({ imageData, onError }) => {
 	}, []);
 
 	/**
-	 * Handles mouse down event for brush/magic wand selection
+	 * Handles mouse down event for brush/magic wand/polygon selection
 	 * @param {MouseEvent} event - Mouse down event
 	 */
 	const handleMouseDown = useCallback((event) => {
@@ -139,25 +172,44 @@ const CanvasEditor = ({ imageData, onError }) => {
 				setIsBrushActive(true);
 				brushSelectionServiceRef.current.startSelection(x, y);
 				setHasSelection(true);
+			} else if (currentTool === 'polygon' && polygonSelectionServiceRef.current) {
+				// Polygon selection - add point on click
+				const pointAdded = polygonSelectionServiceRef.current.addPoint(x, y);
+				
+				if (pointAdded) {
+					// Show overlay as soon as first point is added
+					setIsPolygonActive(true);
+					
+					// Check if polygon is complete
+					if (polygonSelectionServiceRef.current.isPolygonComplete()) {
+						setHasSelection(true);
+						setIsPolygonActive(false); // Polygon drawing is done
+						saveToHistory(); // Save to history after completing polygon
+					}
+				}
 			}
 		} catch (error) {
 			onError?.(`Selection error: ${error.message}`);
 		}
-	}, [selectionMode, currentTool, getMousePos, onError]);
+	}, [selectionMode, currentTool, getMousePos, onError, saveToHistory]);
 
 	/**
-	 * Handles mouse move event for brush selection
+	 * Handles mouse move event for brush and polygon selection
 	 * @param {MouseEvent} event - Mouse move event
 	 */
 	const handleMouseMove = useCallback((event) => {
-		if (currentTool !== 'brush' || !isBrushActive || !selectionMode || !brushSelectionServiceRef.current) return;
-
 		const { x, y } = getMousePos(event);
 
 		try {
-			brushSelectionServiceRef.current.continueSelection(x, y);
+			if (currentTool === 'brush' && isBrushActive && selectionMode && brushSelectionServiceRef.current) {
+				// Brush selection - continue drawing
+				brushSelectionServiceRef.current.continueSelection(x, y);
+			} else if (currentTool === 'polygon' && selectionMode && polygonSelectionServiceRef.current) {
+				// Polygon selection - update preview line
+				polygonSelectionServiceRef.current.updateMousePosition(x, y);
+			}
 		} catch (error) {
-			onError?.(`Brush selection error: ${error.message}`);
+			onError?.(`Selection error: ${error.message}`);
 		}
 	}, [currentTool, isBrushActive, selectionMode, getMousePos, onError]);
 
@@ -190,15 +242,19 @@ const CanvasEditor = ({ imageData, onError }) => {
 	 */
 	const handleClearSelection = useCallback(() => {
 		try {
-			// Clear both brush and magic wand selections
+			// Clear all selection tools
 			if (brushSelectionServiceRef.current) {
 				brushSelectionServiceRef.current.clearMask();
 			}
 			if (magicWandServiceRef.current) {
 				magicWandServiceRef.current.clearMask();
 			}
+			if (polygonSelectionServiceRef.current) {
+				polygonSelectionServiceRef.current.clearMask();
+			}
 			setHasSelection(false);
 			setIsBrushActive(false);
+			setIsPolygonActive(false);
 		} catch (error) {
 			onError?.(`Clear selection error: ${error.message}`);
 		}
@@ -213,14 +269,17 @@ const CanvasEditor = ({ imageData, onError }) => {
 		try {
 			let mask = null;
 
-			// Try to get mask from brush service first
+			// Try to get mask from active tool
 			if (brushSelectionServiceRef.current) {
 				mask = brushSelectionServiceRef.current.getSelectionMask();
 			}
 
-			// If no brush selection, try magic wand
 			if (!mask && magicWandServiceRef.current) {
 				mask = magicWandServiceRef.current.getSelectionMask();
+			}
+
+			if (!mask && polygonSelectionServiceRef.current) {
+				mask = polygonSelectionServiceRef.current.getSelectionMask();
 			}
 
 			if (!mask) {
@@ -230,12 +289,13 @@ const CanvasEditor = ({ imageData, onError }) => {
 
 			const success = maskServiceRef.current.deleteSelectedArea(mask, 'transparent');
 			if (success) {
-				setHasSelection(false);
+				handleClearSelection();
+				saveToHistory();
 			}
 		} catch (error) {
 			onError?.(`Delete selection error: ${error.message}`);
 		}
-	}, [onError]);
+	}, [onError, handleClearSelection, saveToHistory]);
 
 	/**
 	 * Inverts current selection
@@ -247,16 +307,20 @@ const CanvasEditor = ({ imageData, onError }) => {
 			let mask = null;
 			let targetService = null;
 
-			// Try to get mask from brush service first
+			// Try to get mask from active tool
 			if (brushSelectionServiceRef.current) {
 				mask = brushSelectionServiceRef.current.getSelectionMask();
 				targetService = brushSelectionServiceRef.current;
 			}
 
-			// If no brush selection, try magic wand
 			if (!mask && magicWandServiceRef.current) {
 				mask = magicWandServiceRef.current.getSelectionMask();
 				targetService = magicWandServiceRef.current;
+			}
+
+			if (!mask && polygonSelectionServiceRef.current) {
+				mask = polygonSelectionServiceRef.current.getSelectionMask();
+				targetService = polygonSelectionServiceRef.current;
 			}
 
 			if (!mask) {
@@ -266,15 +330,36 @@ const CanvasEditor = ({ imageData, onError }) => {
 
 			const invertedMask = maskServiceRef.current.invertSelection(mask);
 
-			// Update the appropriate service with the inverted mask
-			if (targetService) {
-				const invertedContext = invertedMask.getContext('2d');
-				targetService.maskContext.clearRect(0, 0, imageData.width, imageData.height);
-				targetService.maskContext.drawImage(invertedMask, 0, 0);
+			// Update the mask data context
+			if (targetService && targetService.maskDataContext) {
+				targetService.maskDataContext.clearRect(0, 0, imageData.width, imageData.height);
+				targetService.maskDataContext.drawImage(invertedMask, 0, 0);
 				targetService.selectionMask = invertedMask;
+				
+				// Update the overlay visualization for brush and magic wand
+				if (targetService.overlayContext || targetService.context) {
+					const overlayCtx = targetService.overlayContext || targetService.context;
+					overlayCtx.clearRect(0, 0, imageData.width, imageData.height);
+					
+					// Redraw inverted selection with light red color
+					const invertedImageData = targetService.maskDataContext.getImageData(0, 0, imageData.width, imageData.height);
+					const overlayImageData = overlayCtx.createImageData(imageData.width, imageData.height);
+					
+					for (let i = 0; i < invertedImageData.data.length; i += 4) {
+						if (invertedImageData.data[i + 3] > 200) { // If selected in mask
+							overlayImageData.data[i] = 255;      // R
+							overlayImageData.data[i + 1] = 107;  // G (light red)
+							overlayImageData.data[i + 2] = 107;  // B (light red)
+							overlayImageData.data[i + 3] = 178;  // A (0.7 opacity)
+						}
+					}
+					
+					overlayCtx.putImageData(overlayImageData, 0, 0);
+				}
 			}
 
 		} catch (error) {
+			console.error('Invert selection error:', error);
 			onError?.(`Invert selection error: ${error.message}`);
 		}
 	}, [onError, imageData]);
@@ -296,14 +381,17 @@ const CanvasEditor = ({ imageData, onError }) => {
 		try {
 			let mask = null;
 
-			// Try to get mask from brush service first
+			// Try to get mask from active tool
 			if (brushSelectionServiceRef.current) {
 				mask = brushSelectionServiceRef.current.getSelectionMask();
 			}
 
-			// If no brush selection, try magic wand
 			if (!mask && magicWandServiceRef.current) {
 				mask = magicWandServiceRef.current.getSelectionMask();
+			}
+
+			if (!mask && polygonSelectionServiceRef.current) {
+				mask = polygonSelectionServiceRef.current.getSelectionMask();
 			}
 
 			if (!mask) {
@@ -350,14 +438,17 @@ const CanvasEditor = ({ imageData, onError }) => {
 		try {
 			let mask = null;
 
-			// Try to get mask from brush service first
+			// Try to get mask from active tool
 			if (brushSelectionServiceRef.current) {
 				mask = brushSelectionServiceRef.current.getSelectionMask();
 			}
 
-			// If no brush selection, try magic wand
 			if (!mask && magicWandServiceRef.current) {
 				mask = magicWandServiceRef.current.getSelectionMask();
+			}
+
+			if (!mask && polygonSelectionServiceRef.current) {
+				mask = polygonSelectionServiceRef.current.getSelectionMask();
 			}
 
 			if (!mask) {
@@ -384,17 +475,19 @@ const CanvasEditor = ({ imageData, onError }) => {
 					throw new Error('Clipboard API not supported');
 				}
 			} catch (clipboardError) {
+				console.warn('Clipboard API failed, using download fallback:', clipboardError);
 				// Fallback for older browsers - download the image
 				const link = document.createElement('a');
 				link.href = dataUrl;
 				link.download = 'selection.png';
 				link.style.display = 'none';
 				document.body.appendChild(link);
-		link.click();
+				link.click();
 				document.body.removeChild(link);
 				alert('✅ Selection downloaded as selection.png');
 			}
 		} catch (error) {
+			console.error('Copy selection error:', error);
 			onError?.(`Copy selection error: ${error.message}`);
 		}
 	}, [onError, hasSelection]);
@@ -412,13 +505,21 @@ const CanvasEditor = ({ imageData, onError }) => {
 	}, []);
 
 	/**
-	 * Handles tool change (brush/magic wand)
-	 * @param {string} tool - Tool type ('brush' or 'magicWand')
+	 * Handles tool change (brush/magic wand/polygon)
+	 * @param {string} tool - Tool type ('brush', 'magicWand', or 'polygon')
 	 */
 	const handleToolChange = useCallback((tool) => {
+		// Clear any incomplete polygon when switching tools
+		if (currentTool === 'polygon' && tool !== 'polygon' && polygonSelectionServiceRef.current) {
+			if (!polygonSelectionServiceRef.current.isPolygonComplete()) {
+				polygonSelectionServiceRef.current.clearMask();
+			}
+		}
+		
 		setCurrentTool(tool);
 		setIsBrushActive(false);
-	}, []);
+		setIsPolygonActive(false);
+	}, [currentTool]);
 
 	/**
 	 * Handles magic wand tolerance change
@@ -430,6 +531,40 @@ const CanvasEditor = ({ imageData, onError }) => {
 			magicWandServiceRef.current.setTolerance(tolerance);
 		}
 	}, []);
+
+	/**
+	 * Handles undo operation
+	 */
+	const handleUndo = useCallback(async () => {
+		if (!historyServiceRef.current || !canvasRef.current) return;
+
+		try {
+			const success = await historyServiceRef.current.undo(canvasRef.current);
+			if (success) {
+				handleClearSelection(); // Clear any active selection
+				updateHistoryState();
+			}
+		} catch (error) {
+			onError?.(`Undo error: ${error.message}`);
+		}
+	}, [onError, handleClearSelection, updateHistoryState]);
+
+	/**
+	 * Handles redo operation
+	 */
+	const handleRedo = useCallback(async () => {
+		if (!historyServiceRef.current || !canvasRef.current) return;
+
+		try {
+			const success = await historyServiceRef.current.redo(canvasRef.current);
+			if (success) {
+				handleClearSelection(); // Clear any active selection
+				updateHistoryState();
+			}
+		} catch (error) {
+			onError?.(`Redo error: ${error.message}`);
+		}
+	}, [onError, handleClearSelection, updateHistoryState]);
 
 	/**
 	 * Legacy download function for backward compatibility
@@ -490,7 +625,7 @@ const CanvasEditor = ({ imageData, onError }) => {
 							width: '100%',
 							height: '100%',
 							pointerEvents: 'none',
-							opacity: selectionMode && (isBrushActive || hasSelection) ? 1 : 0,
+							opacity: selectionMode && (isBrushActive || isPolygonActive || hasSelection) ? 1 : 0,
 							transition: 'opacity 0.3s ease',
 							zIndex: 10,
 							borderRadius: "8px",
@@ -505,6 +640,8 @@ const CanvasEditor = ({ imageData, onError }) => {
 					selectionMode={selectionMode}
 					currentTool={currentTool}
 					magicWandTolerance={magicWandTolerance}
+					canUndo={canUndo}
+					canRedo={canRedo}
 					onBrushSizeChange={handleBrushSizeChange}
 					onClearSelection={handleClearSelection}
 					onDeleteSelection={handleDeleteSelection}
@@ -515,6 +652,8 @@ const CanvasEditor = ({ imageData, onError }) => {
 					onSelectionModeChange={handleSelectionModeChange}
 					onToolChange={handleToolChange}
 					onMagicWandToleranceChange={handleMagicWandToleranceChange}
+					onUndo={handleUndo}
+					onRedo={handleRedo}
 					disabled={!imageData}
 				/>
 			</div>

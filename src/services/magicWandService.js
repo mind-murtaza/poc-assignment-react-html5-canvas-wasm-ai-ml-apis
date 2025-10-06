@@ -13,8 +13,9 @@ class MagicWandService {
 	constructor(mainContext, overlayContext, canvasWidth, canvasHeight) {
 		this.mainContext = mainContext; // Read image data from main canvas
 		this.overlayContext = overlayContext; // Draw selection on overlay canvas
-		this.canvasWidth = canvasWidth;
-		this.canvasHeight = canvasHeight;
+		// CRITICAL FIX: Use integer dimensions for pixel operations
+		this.canvasWidth = Math.floor(canvasWidth);
+		this.canvasHeight = Math.floor(canvasHeight);
 		this.tolerance = 30; // Default tolerance (0-255)
 		this.selectionMask = null;
 		this.selectionColor = 'rgba(255, 107, 107, 0.7)'; // Light red for selection
@@ -30,7 +31,8 @@ class MagicWandService {
 		this.maskDataCanvas = document.createElement('canvas');
 		this.maskDataCanvas.width = this.canvasWidth;
 		this.maskDataCanvas.height = this.canvasHeight;
-		this.maskDataContext = this.maskDataCanvas.getContext('2d');
+		// Use willReadFrequently for better performance with getImageData
+		this.maskDataContext = this.maskDataCanvas.getContext('2d', { willReadFrequently: true });
 
 		// Initialize with transparent mask
 		this.clearMask();

@@ -11,8 +11,9 @@ class MaskService {
 	 */
 	constructor(context, canvasWidth, canvasHeight) {
 		this.context = context;
-		this.canvasWidth = canvasWidth;
-		this.canvasHeight = canvasHeight;
+		// Use integer dimensions for pixel operations (consistent with other services)
+		this.canvasWidth = Math.floor(canvasWidth);
+		this.canvasHeight = Math.floor(canvasHeight);
 	}
 
 	/**

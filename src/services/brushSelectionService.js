@@ -11,8 +11,9 @@ class BrushSelectionService {
 	 */
 	constructor(context, canvasWidth, canvasHeight) {
 		this.context = context;
-		this.canvasWidth = canvasWidth;
-		this.canvasHeight = canvasHeight;
+		// Use integer dimensions for pixel operations
+		this.canvasWidth = Math.floor(canvasWidth);
+		this.canvasHeight = Math.floor(canvasHeight);
 		this.brushSize = 10; // Default brush size
 		this.isDrawing = false;
 		this.selectionMask = null;

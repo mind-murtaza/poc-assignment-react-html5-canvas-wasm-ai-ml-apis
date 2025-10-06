@@ -11,8 +11,9 @@ class ExportService {
 	 */
 	constructor(context, canvasWidth, canvasHeight) {
 		this.context = context;
-		this.canvasWidth = canvasWidth;
-		this.canvasHeight = canvasHeight;
+		// Use integer dimensions for pixel operations (consistent with other services)
+		this.canvasWidth = Math.floor(canvasWidth);
+		this.canvasHeight = Math.floor(canvasHeight);
 	}
 
 	/**
@@ -197,15 +198,23 @@ class ExportService {
 		let minY = this.canvasHeight;
 		let maxX = 0;
 		let maxY = 0;
+		let selectedPixelCount = 0;
+
+		// Find the bounds of the selected area
 
 		for (let y = 0; y < this.canvasHeight; y++) {
 			for (let x = 0; x < this.canvasWidth; x++) {
 				const index = (y * this.canvasWidth + x) * 4;
-				if (maskData[index + 3] > 200) { // Selected pixel (higher threshold for mask data)
+				// Check if pixel is selected (either high alpha OR white RGB)
+				const hasAlpha = maskData[index + 3] > 200;
+				const isWhite = maskData[index] > 200 && maskData[index + 1] > 200 && maskData[index + 2] > 200;
+				
+				if (hasAlpha || isWhite) {
 					minX = Math.min(minX, x);
 					minY = Math.min(minY, y);
 					maxX = Math.max(maxX, x);
 					maxY = Math.max(maxY, y);
+					selectedPixelCount++;
 				}
 			}
 		}

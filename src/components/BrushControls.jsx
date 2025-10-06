@@ -15,12 +15,16 @@ const BrushControls = ({
 	onSelectionModeChange,
 	onToolChange,
 	onMagicWandToleranceChange,
+	onUndo,
+	onRedo,
 	brushSize = 10,
 	hasSelection = false,
 	disabled = false,
 	selectionMode = true,
 	currentTool = 'brush',
-	magicWandTolerance = 30
+	magicWandTolerance = 30,
+	canUndo = false,
+	canRedo = false
 }) => {
 	const [currentBrushSize, setCurrentBrushSize] = useState(brushSize);
 	const [isSelectionMode, setIsSelectionMode] = useState(selectionMode);
@@ -269,7 +273,7 @@ const BrushControls = ({
 							className={`tool-btn ${currentToolState === 'brush' ? 'active' : ''}`}
 							onClick={() => handleToolChange('brush')}
 							disabled={disabled}
-							title="Brush selection tool"
+							title="Brush selection tool - Click and drag to paint selection"
 						>
 							🖌️ Brush
 						</button>
@@ -278,9 +282,18 @@ const BrushControls = ({
 							className={`tool-btn ${currentToolState === 'magicWand' ? 'active' : ''}`}
 							onClick={() => handleToolChange('magicWand')}
 							disabled={disabled}
-							title="Magic wand selection tool"
+							title="Magic wand selection tool - Click to select similar colors"
 						>
 							🪄 Magic Wand
+						</button>
+						<button
+							type="button"
+							className={`tool-btn ${currentToolState === 'polygon' ? 'active' : ''}`}
+							onClick={() => handleToolChange('polygon')}
+							disabled={disabled}
+							title="Polygon selection tool - Click to add points, click first point to close"
+						>
+							⬡ Polygon
 						</button>
 					</div>
 				</div>
@@ -342,6 +355,38 @@ const BrushControls = ({
 						</div>
 					</div>
 				)}
+
+				{currentToolState === 'polygon' && (
+					<div className="polygon-info">
+						<p className="info-text">
+							📍 Click to add points<br />
+							🎯 Click first point to close polygon<br />
+							⌨️ Minimum 3 points required
+						</p>
+					</div>
+				)}
+
+				{/* History Controls */}
+				<div className="history-controls">
+					<button
+						type="button"
+						className="btn btn-icon"
+						onClick={onUndo}
+						disabled={disabled || !canUndo}
+						title="Undo last action (Ctrl+Z)"
+					>
+						↶ Undo
+					</button>
+					<button
+						type="button"
+						className="btn btn-icon"
+						onClick={onRedo}
+						disabled={disabled || !canRedo}
+						title="Redo last action (Ctrl+Y)"
+					>
+						↷ Redo
+					</button>
+				</div>
 			</div>
 
 			{renderSelectionOperations()}

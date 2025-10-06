@@ -1021,6 +1021,45 @@ body {
 	font-size: 0.8rem;
 }
 
+.polygon-info {
+	margin-bottom: 20px;
+	padding: 15px;
+	background: #f8f9fa;
+	border-radius: 8px;
+	border-left: 4px solid #667eea;
+}
+
+.polygon-info .info-text {
+	margin: 0;
+	font-size: 0.9rem;
+	line-height: 1.8;
+	color: #495057;
+}
+
+.history-controls {
+	display: flex;
+	gap: 10px;
+	margin-bottom: 20px;
+	padding-bottom: 20px;
+	border-bottom: 2px solid #e9ecef;
+}
+
+.history-controls .btn-icon {
+	flex: 1;
+	padding: 10px 16px;
+	font-size: 0.95rem;
+	font-weight: 600;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+}
+
+.history-controls .btn-icon:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
 
 .selection-operations {
 	display: flex;
