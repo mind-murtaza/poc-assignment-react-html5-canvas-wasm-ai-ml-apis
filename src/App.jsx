@@ -37,8 +37,9 @@ function App() {
 	return (
 		<div className="app">
 			<header className="app-header">
-				<h1>🎨 POC Image Editor</h1>
-				<p>React + Canvas + WASM + AI Vision + Natural Language</p>
+				<div className="header-content">
+					<h1>Image Editor</h1>
+				</div>
 			</header>
 
 			<main className="app-main">
@@ -83,10 +84,10 @@ function App() {
 							/>
 						</div>
 
-						{/* Reset Button */}
-						<div className="reset-section">
+						{/* Actions */}
+						<div className="app-actions">
 							<button
-								className="reset-button"
+								className="btn btn-secondary btn--large"
 								onClick={() => {
 									setCurrentImage(null);
 									showToast("Ready for new image", "info");

@@ -52,38 +52,50 @@ const AIControls = ({ imageData, onLoadingChange, onSuccess, onError }) => {
 
 	return (
 		<div className="control-group">
-			<h3>🤖 Hugging Face RMBG-1.4</h3>
+			<h3>AI Background Removal</h3>
 
 			<div className="ai-section">
 				<div className="api-status">
-					<div className="status-success">
-						<p>✅ Hugging Face RMBG-1.4 Ready</p>
-						{accountInfo && (
-						<>
-							<p>Credits: {accountInfo?.data?.attributes?.api?.free_calls || 0}</p>
-							<p>Service: {accountInfo?.service}</p>
-							<p>Model: {accountInfo?.model}</p>
-							<p>Provider: {accountInfo?.provider}</p>
-						</>
+					{accountInfo ? (
+						<div className="service-info">
+							<div className="service-header">
+								<h4>Hugging Face RMBG-1.4</h4>
+								<span className="service-badge">Active</span>
+							</div>
+							<div className="service-details">
+								<div className="detail-item">
+									<span className="detail-label">API Credits</span>
+									<span className="detail-value">{accountInfo?.data?.attributes?.api?.free_calls || 0}</span>
+								</div>
+								<div className="detail-item">
+									<span className="detail-label">Provider</span>
+									<span className="detail-value">{accountInfo?.provider || 'Hugging Face'}</span>
+								</div>
+							</div>
+						</div>
+					) : (
+						<div className="service-loading">
+							<span className="spinner-small"></span>
+							<span>Loading service info...</span>
+						</div>
 					)}
-					</div>
 				</div>
 
 				<button
-					className="btn btn-primary"
+					className="btn btn-primary btn--large"
 					onClick={handleRemoveBackground}
 					disabled={isProcessing || !imageData}
 				>
-					{isProcessing ? "🔄 Processing..." : "✂️ Remove Background"}
+					{isProcessing ? "Processing..." : "Remove Background"}
 				</button>
 
 				<div className="ai-info">
-					<h4>How it works:</h4>
-					<ul>
-						<li>🧠 AI analyzes your image</li>
-						<li>🎯 Identifies foreground objects</li>
-						<li>✂️ Removes background automatically</li>
-						<li>🖼️ Returns transparent PNG</li>
+					<h4>Process Overview</h4>
+					<ul className="process-list">
+						<li>Analyzes image content using AI</li>
+						<li>Identifies and segments foreground objects</li>
+						<li>Removes background with high precision</li>
+						<li>Returns result as transparent PNG</li>
 					</ul>
 				</div>
 			</div>

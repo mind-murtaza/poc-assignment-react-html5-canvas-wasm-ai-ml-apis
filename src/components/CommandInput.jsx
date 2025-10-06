@@ -1,10 +1,14 @@
-import React, { useState } from "react";
-import { parseCommand, executeCommand } from "../services/groqApi";
+import React, { useState, useEffect } from "react";
+import { parseCommand, initializeEngine, isEngineReady } from "../services/webLLMService";
+import { executeCommand } from "../services/canvasOperations";
 
 const CommandInput = ({ imageData, onLoadingChange, onSuccess, onError }) => {
 	const [command, setCommand] = useState("");
 	const [isProcessing, setIsProcessing] = useState(false);
 	const [commandHistory, setCommandHistory] = useState([]);
+	const [isModelLoading, setIsModelLoading] = useState(false);
+	const [isModelReady, setIsModelReady] = useState(false);
+	const [loadingProgress, setLoadingProgress] = useState("");
 
 	const exampleCommands = [
 		"draw red circle",
@@ -17,6 +21,37 @@ const CommandInput = ({ imageData, onLoadingChange, onSuccess, onError }) => {
 		"draw orange square in center"
 	];
 
+	// Check if model is ready on mount
+	useEffect(() => {
+		setIsModelReady(isEngineReady());
+	}, []);
+
+	// Initialize Web LLM model
+	const handleInitializeModel = async () => {
+		setIsModelLoading(true);
+		setLoadingProgress("Initializing Web LLM...");
+
+		try {
+			await initializeEngine((progress) => {
+				// Format progress message
+				if (progress.text) {
+					setLoadingProgress(progress.text);
+				} else if (progress.progress) {
+					setLoadingProgress(`Loading model: ${Math.round(progress.progress * 100)}%`);
+				}
+			});
+
+			setIsModelReady(true);
+			setLoadingProgress("");
+			onSuccess?.("Web LLM model loaded successfully! You can now use AI commands.");
+		} catch (error) {
+			onError?.(`Failed to load model: ${error.message}`);
+			setLoadingProgress("");
+		} finally {
+			setIsModelLoading(false);
+		}
+	};
+
 	const handleSubmit = async (e) => {
 		e.preventDefault();
 		await executeNaturalCommand(command.trim());
@@ -25,6 +60,11 @@ const CommandInput = ({ imageData, onLoadingChange, onSuccess, onError }) => {
 	const executeNaturalCommand = async (commandText) => {
 		if (!commandText) {
 			onError("Please enter a command");
+			return;
+		}
+
+		if (!isModelReady) {
+			onError("Please initialize the AI model first");
 			return;
 		}
 
@@ -37,8 +77,12 @@ const CommandInput = ({ imageData, onLoadingChange, onSuccess, onError }) => {
 		onLoadingChange(true, "Parsing command with AI...");
 
 		try {
-			// Parse command using Groq API
-			const parsedCommand = await parseCommand(commandText);
+			// Parse command using Web LLM
+			const parsedCommand = await parseCommand(commandText, (progress) => {
+				if (progress.text) {
+					onLoadingChange(true, progress.text);
+				}
+			});
 
 			onLoadingChange(true, "Executing command...");
 
@@ -72,54 +116,93 @@ const CommandInput = ({ imageData, onLoadingChange, onSuccess, onError }) => {
 		setCommand(exampleCommand);
 	};
 
-	const isApiConfigured =
-		import.meta.env.VITE_GROQ_API_KEY &&
-		import.meta.env.VITE_GROQ_API_KEY !== "your_groq_api_key_here";
-
 	return (
 		<div className="control-group">
-			<h3>💬 Natural Language Commands</h3>
+			<h3>Natural Language Commands</h3>
 
-			{!isApiConfigured && (
-				<div className="status-warning">
-					<p>⚠️ Groq API not configured</p>
-					<small>Add VITE_GROQ_API_KEY to your .env file</small>
+			{!isModelReady && !isModelLoading && (
+				<div className="llm-status llm-status--inactive">
+					<div className="llm-status__content">
+						<div className="llm-status__header">
+							<span className="llm-status__indicator"></span>
+							<h4>AI Model Initialization Required</h4>
+						</div>
+						<p className="llm-status__description">
+							First-time setup downloads ~1.5GB to browser cache (one-time operation)
+						</p>
+					</div>
+					<button
+						className="btn btn-primary btn--large"
+						onClick={handleInitializeModel}
+						disabled={isModelLoading}
+					>
+						Initialize Model
+					</button>
+				</div>
+			)}
+
+			{isModelLoading && (
+				<div className="llm-status llm-status--loading">
+					<div className="llm-status__content">
+						<div className="llm-status__header">
+							<div className="llm-spinner"></div>
+							<h4>Initializing AI Model</h4>
+						</div>
+						<p className="llm-status__progress">{loadingProgress || "Loading model..."}</p>
+						<p className="llm-status__description">
+							This process may take several minutes. Please do not close this tab.
+						</p>
+					</div>
+				</div>
+			)}
+
+			{isModelReady && (
+				<div className="llm-status llm-status--ready">
+					<div className="llm-status__content">
+						<div className="llm-status__header">
+							<span className="llm-status__indicator"></span>
+							<h4>Model Active</h4>
+						</div>
+						<p className="llm-status__description">
+							Local inference ready • Privacy-first • Offline capable
+						</p>
+					</div>
 				</div>
 			)}
 
 			<form onSubmit={handleSubmit} className="command-form">
 				<div className="form-group">
-					<label className="form-label">Enter your command:</label>
+					<label className="form-label">Command Input</label>
 					<input
 						type="text"
 						className="form-control"
 						value={command}
 						onChange={(e) => setCommand(e.target.value)}
-						placeholder="Try: 'draw red circle' or 'brighten image 20%'"
-						disabled={!isApiConfigured || isProcessing || !imageData}
+						placeholder="e.g., 'draw red circle' or 'brighten image 20%'"
+						disabled={!isModelReady || isProcessing || !imageData || isModelLoading}
 					/>
 				</div>
 
 				<button
 					type="submit"
-					className="btn btn-success"
+					className="btn btn-primary btn--execute"
 					disabled={
-						!isApiConfigured || isProcessing || !imageData || !command.trim()
+						!isModelReady || isProcessing || !imageData || !command.trim() || isModelLoading
 					}
 				>
-					{isProcessing ? "🤖 Processing..." : "⚡ Execute Command"}
+					{isProcessing ? "Processing..." : "Execute Command"}
 				</button>
 			</form>
 
 			<div className="command-examples">
-				<h4>Example Commands:</h4>
+				<h4>Quick Actions</h4>
 				<div className="example-buttons">
 					{exampleCommands.map((example, index) => (
 						<button
 							key={index}
-							className="example-btn"
+							className="btn btn-secondary btn--example"
 							onClick={() => handleExampleClick(example)}
-							disabled={!isApiConfigured || isProcessing || !imageData}
+							disabled={!isModelReady || isProcessing || !imageData || isModelLoading}
 						>
 							{example}
 						</button>
@@ -129,18 +212,19 @@ const CommandInput = ({ imageData, onLoadingChange, onSuccess, onError }) => {
 
 			{commandHistory.length > 0 && (
 				<div className="command-history">
-					<h4>Recent Commands:</h4>
+					<h4>Command History</h4>
 					<div className="history-list">
 						{commandHistory.slice(0, 5).map((item, index) => (
 							<div key={index} className="history-item">
-								<span className="history-command">"{item.command}"</span>
+								<code className="history-command">{item.command}</code>
 								<button
-									className="history-repeat"
+									className="btn btn-icon"
 									onClick={() => executeNaturalCommand(item.command)}
 									disabled={isProcessing || !imageData}
 									title="Repeat command"
+									aria-label="Repeat command"
 								>
-									🔄
+									↻
 								</button>
 							</div>
 						))}
@@ -148,17 +232,26 @@ const CommandInput = ({ imageData, onLoadingChange, onSuccess, onError }) => {
 				</div>
 			)}
 
-			<div className="command-info">
-				<h4>Supported Commands:</h4>
-				<ul>
-					<li><strong>Draw shapes:</strong> "draw [color] [shape]" or "draw [size] [color] [shape] at [position]"</li>
-					<li><strong>Shapes:</strong> circle, rectangle, square, triangle, line</li>
-					<li><strong>Colors:</strong> red, blue, green, yellow, purple, black, white, orange, pink</li>
-					<li><strong>Positions:</strong> center, top left, top right, bottom left, bottom right</li>
-					<li><strong>Sizes:</strong> small, large, or default</li>
-					<li><strong>Brightness:</strong> "brighten/darken image [X]%"</li>
-					<li><strong>Contrast:</strong> "increase/decrease contrast [X]%"</li>
-				</ul>
+			<div className="command-reference">
+				<h4>Command Reference</h4>
+				<div className="reference-grid">
+					<div className="reference-section">
+						<h5>Shapes</h5>
+						<p>circle, rectangle, square, triangle, line</p>
+					</div>
+					<div className="reference-section">
+						<h5>Colors</h5>
+						<p>red, blue, green, yellow, purple, black, white, orange, pink</p>
+					</div>
+					<div className="reference-section">
+						<h5>Positions</h5>
+						<p>center, top left, top right, bottom left, bottom right</p>
+					</div>
+					<div className="reference-section">
+						<h5>Adjustments</h5>
+						<p>brighten/darken [X]%, increase/decrease contrast [X]%</p>
+					</div>
+				</div>
 			</div>
 		</div>
 	);

@@ -470,7 +470,7 @@ const CanvasEditor = ({ imageData, onError }) => {
 					const clipboardItem = new window.ClipboardItem({ 'image/png': blob });
 					await navigator.clipboard.write([clipboardItem]);
 					// Show success feedback to user
-					alert('✅ Selection copied to clipboard! You can now paste it anywhere.');
+					alert('Selection copied to clipboard successfully.');
 				} else {
 					throw new Error('Clipboard API not supported');
 				}
@@ -484,7 +484,7 @@ const CanvasEditor = ({ imageData, onError }) => {
 				document.body.appendChild(link);
 				link.click();
 				document.body.removeChild(link);
-				alert('✅ Selection downloaded as selection.png');
+				alert('Selection downloaded as selection.png');
 			}
 		} catch (error) {
 			console.error('Copy selection error:', error);
@@ -578,20 +578,21 @@ const CanvasEditor = ({ imageData, onError }) => {
 		<div className="canvas-editor">
 			<div className="canvas-toolbar">
 				<div className="canvas-info">
-					<span>
-						📐 {imageData.width} × {imageData.height}px
+					<span className="info-item">
+						{Math.floor(imageData.width)} × {Math.floor(imageData.height)}px
 					</span>
-					<span>📁 {imageData.fileName}</span>
-					{hasSelection && <span className="selection-indicator">✓ Selection Active</span>}
+					<span className="info-item info-separator">|</span>
+					<span className="info-item">{imageData.fileName}</span>
+					{hasSelection && <span className="selection-badge">Active Selection</span>}
 				</div>
 
 				<div className="canvas-actions">
 					<button
 						className="btn btn-primary"
 						onClick={downloadImage}
-						title="Download Image (PNG)"
+						title="Download image"
 					>
-						💾 Download
+						Download
 					</button>
 				</div>
 			</div>

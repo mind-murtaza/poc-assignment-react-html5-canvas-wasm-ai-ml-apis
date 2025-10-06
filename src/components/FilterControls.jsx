@@ -85,15 +85,18 @@ const FilterControls = ({ imageData, onLoadingChange, onError }) => {
 	if (error) {
 		return (
 			<div className="control-group">
-				<h3>🔧 WASM Filters</h3>
-				<div className="error-message">
-					<p>⚠️ OpenCV Error: {error}</p>
-					<button
-						className="btn btn-secondary"
-						onClick={() => window.location.reload()}
-					>
-						Reload Page
-					</button>
+				<h3>OpenCV Filters</h3>
+				<div className="error-state">
+					<div className="error-content">
+						<h4>Initialization Error</h4>
+						<p className="error-text">{error}</p>
+						<button
+							className="btn btn-secondary"
+							onClick={() => window.location.reload()}
+						>
+							Reload Application
+						</button>
+					</div>
 				</div>
 			</div>
 		);
@@ -101,11 +104,14 @@ const FilterControls = ({ imageData, onLoadingChange, onError }) => {
 
 	return (
 		<div className="control-group">
-			<h3>🔧 WASM Filters</h3>
+			<h3>OpenCV Filters</h3>
 
 			{!isReady && (
-				<div className="opencv-loading">
-					<p>🔄 Loading OpenCV.js...</p>
+				<div className="wasm-loading">
+					<div className="loading-content">
+						<div className="spinner-small"></div>
+						<p>Initializing OpenCV.js...</p>
+					</div>
 					<div className="progress-bar">
 						<div className="progress-fill"></div>
 					</div>
@@ -152,30 +158,31 @@ const FilterControls = ({ imageData, onLoadingChange, onError }) => {
 
 				{selectedFilter !== "none" && (
 					<div className="range-group">
-						<label className="form-label">Intensity:</label>
-						<input
-							type="range"
-							className="range-slider"
-							min="1"
-							max="20"
-							value={intensity}
-							onChange={(e) => handleIntensityChange(parseInt(e.target.value))}
-							disabled={!isReady}
-						/>
-						<span className="range-value">
-							{intensity}
-							{selectedFilter === 'edge' && (
-								<small style={{display: 'block', fontSize: '0.7em', color: '#666'}}>
-									(kernel: {[1, 3, 5, 7][Math.min(Math.floor(((intensity - 1) / 19) * 3), 3)]})
-								</small>
-							)}
-						</span>
+						<label className="form-label">Intensity</label>
+						<div className="range-control">
+							<input
+								type="range"
+								className="range-slider"
+								min="1"
+								max="20"
+								value={intensity}
+								onChange={(e) => handleIntensityChange(parseInt(e.target.value))}
+								disabled={!isReady}
+							/>
+							<span className="range-value">{intensity}</span>
+						</div>
+						{selectedFilter === 'edge' && (
+							<small className="range-hint">
+								Kernel size: {[1, 3, 5, 7][Math.min(Math.floor(((intensity - 1) / 19) * 3), 3)]}
+							</small>
+						)}
 					</div>
 				)}
 
 				{isReady && (
-					<div className="filter-info">
-						<small>✅ OpenCV.js loaded and ready</small>
+					<div className="status-ready">
+						<span className="status-indicator"></span>
+						<span>OpenCV.js Ready</span>
 					</div>
 				)}
 			</div>

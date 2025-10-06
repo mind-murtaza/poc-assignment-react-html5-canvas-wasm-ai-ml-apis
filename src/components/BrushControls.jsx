@@ -164,9 +164,9 @@ const BrushControls = ({
 							className="btn btn-secondary"
 							onClick={handleClearSelection}
 							disabled={disabled}
-							title="Clear current selection"
+							title="Clear selection"
 						>
-							🗑️ Clear
+							Clear
 						</button>
 						<button
 							type="button"
@@ -175,25 +175,25 @@ const BrushControls = ({
 							disabled={disabled}
 							title="Delete selected area"
 						>
-							✂️ Delete
+							Delete
 						</button>
 						<button
 							type="button"
 							className="btn btn-secondary"
 							onClick={handleInvertSelection}
 							disabled={disabled}
-							title="Invert current selection"
+							title="Invert selection"
 						>
-							🔄 Invert
+							Invert
 						</button>
 						<button
 							type="button"
 							className="btn btn-primary"
 							onClick={handleCopySelection}
 							disabled={disabled}
-							title="Copy selected area to clipboard"
+							title="Copy to clipboard"
 						>
-							📋 Copy
+							Copy
 						</button>
 					</div>
 				</div>
@@ -206,18 +206,18 @@ const BrushControls = ({
 							className="btn btn-primary"
 							onClick={() => handleExportSelection('png')}
 							disabled={disabled}
-							title="Export selection as PNG"
+							title="Export as PNG"
 						>
-							📥 PNG
+							PNG
 						</button>
 						<button
 							type="button"
 							className="btn btn-primary"
 							onClick={() => handleExportSelection('jpeg')}
 							disabled={disabled}
-							title="Export selection as JPEG"
+							title="Export as JPEG"
 						>
-							📥 JPEG
+							JPEG
 						</button>
 					</div>
 				</div>
@@ -227,21 +227,21 @@ const BrushControls = ({
 					<div className="export-buttons">
 						<button
 							type="button"
-							className="btn btn-success"
+							className="btn btn-secondary"
 							onClick={() => handleExportCanvas('png')}
 							disabled={disabled}
-							title="Export entire canvas as PNG"
+							title="Export canvas as PNG"
 						>
-							🖼️ PNG
+							PNG
 						</button>
 						<button
 							type="button"
-							className="btn btn-success"
+							className="btn btn-secondary"
 							onClick={() => handleExportCanvas('jpeg')}
 							disabled={disabled}
-							title="Export entire canvas as JPEG"
+							title="Export canvas as JPEG"
 						>
-							🖼️ JPEG
+							JPEG
 						</button>
 					</div>
 				</div>
@@ -252,7 +252,7 @@ const BrushControls = ({
 	return (
 		<div className={`brush-controls ${disabled ? 'disabled' : ''}`}>
 			<div className="control-section">
-				<h3>✨ Selection Tool</h3>
+				<h3>Selection Tools</h3>
 
 				<div className="mode-toggle">
 					<label className="toggle-label">
@@ -260,40 +260,40 @@ const BrushControls = ({
 							<span className="toggle-slider"></span>
 						</span>
 						<span className="toggle-text" onClick={handleSelectionModeToggle}>
-							Selection Mode {isSelectionMode ? 'ON' : 'OFF'}
+							Selection Mode {isSelectionMode ? 'Active' : 'Inactive'}
 						</span>
 					</label>
 				</div>
 
 				<div className="tool-selection">
-					<label>Tool:</label>
+					<label>Active Tool</label>
 					<div className="tool-buttons">
 						<button
 							type="button"
 							className={`tool-btn ${currentToolState === 'brush' ? 'active' : ''}`}
 							onClick={() => handleToolChange('brush')}
 							disabled={disabled}
-							title="Brush selection tool - Click and drag to paint selection"
+							title="Brush selection tool"
 						>
-							🖌️ Brush
+							Brush
 						</button>
 						<button
 							type="button"
 							className={`tool-btn ${currentToolState === 'magicWand' ? 'active' : ''}`}
 							onClick={() => handleToolChange('magicWand')}
 							disabled={disabled}
-							title="Magic wand selection tool - Click to select similar colors"
+							title="Magic wand selection tool"
 						>
-							🪄 Magic Wand
+							Magic Wand
 						</button>
 						<button
 							type="button"
 							className={`tool-btn ${currentToolState === 'polygon' ? 'active' : ''}`}
 							onClick={() => handleToolChange('polygon')}
 							disabled={disabled}
-							title="Polygon selection tool - Click to add points, click first point to close"
+							title="Polygon selection tool"
 						>
-							⬡ Polygon
+							Polygon
 						</button>
 					</div>
 				</div>
@@ -359,9 +359,7 @@ const BrushControls = ({
 				{currentToolState === 'polygon' && (
 					<div className="polygon-info">
 						<p className="info-text">
-							📍 Click to add points<br />
-							🎯 Click first point to close polygon<br />
-							⌨️ Minimum 3 points required
+							Click to add points • Click first point to close • Minimum 3 points required
 						</p>
 					</div>
 				)}
@@ -370,32 +368,26 @@ const BrushControls = ({
 				<div className="history-controls">
 					<button
 						type="button"
-						className="btn btn-icon"
+						className="btn btn-secondary"
 						onClick={onUndo}
 						disabled={disabled || !canUndo}
-						title="Undo last action (Ctrl+Z)"
+						title="Undo last action"
 					>
-						↶ Undo
+						Undo
 					</button>
 					<button
 						type="button"
-						className="btn btn-icon"
+						className="btn btn-secondary"
 						onClick={onRedo}
 						disabled={disabled || !canRedo}
-						title="Redo last action (Ctrl+Y)"
+						title="Redo last action"
 					>
-						↷ Redo
+						Redo
 					</button>
 				</div>
 			</div>
 
 			{renderSelectionOperations()}
-
-			<div className="control-info">
-				<small>
-					💡 Tip: Hold and drag to paint your selection. Use small brush for precision, large for broad areas.
-				</small>
-			</div>
 		</div>
 	);
 };

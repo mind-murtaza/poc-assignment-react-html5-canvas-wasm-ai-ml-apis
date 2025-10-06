@@ -63,8 +63,8 @@ const ImageUploader = ({ onImageLoad, onError }) => {
 					height *= ratio;
 				}
 
-				canvas.width = width;
-				canvas.height = height;
+				canvas.width = Math.floor(width);
+				canvas.height = Math.floor(height);
 
 				// Draw image on canvas
 				ctx.drawImage(img, 0, 0, width, height);
@@ -110,23 +110,23 @@ const ImageUploader = ({ onImageLoad, onError }) => {
 				<div className="drop-content">
 					<div className="upload-icon">
 						<svg
-							width="64"
-							height="64"
+							width="48"
+							height="48"
 							viewBox="0 0 24 24"
 							fill="none"
 							stroke="currentColor"
 							strokeWidth="1.5"
 						>
-							<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path>
-							<circle cx="12" cy="13" r="3"></circle>
+							<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+							<polyline points="17 8 12 3 7 8"></polyline>
+							<line x1="12" y1="3" x2="12" y2="15"></line>
 						</svg>
 					</div>
-					<h3>Upload Your Image</h3>
+					<h3>Upload Image</h3>
 					<p>
-						Drop an image here or{" "}
-						<span className="upload-link">browse files</span>
+						Drop image here or <span className="upload-link">browse</span>
 					</p>
-					<small>Supports JPG, PNG, GIF up to 10MB</small>
+					<small className="upload-hint">JPG, PNG, GIF • Max 10MB</small>
 				</div>
 
 				<input
